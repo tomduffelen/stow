@@ -341,6 +341,16 @@
   }
   .ai-item-fields input:focus{ outline:none; border-color:var(--brass); }
   #ai-review-empty{ color:var(--muted); font-size:14px; text-align:center; padding:20px 0; }
+  #ai-check-warning{
+    background:rgba(201,162,39,0.1);
+    border:1px solid rgba(201,162,39,0.3);
+    border-radius:12px;
+    padding:12px 14px;
+    color:var(--brass);
+    font-size:13px;
+    line-height:1.5;
+    margin-bottom:16px;
+  }
   #ai-error{ color:var(--danger); font-size:13.5px; margin-bottom:14px; display:none; }
 </style>
 </head>
@@ -480,6 +490,7 @@
 <div id="overlay-ai-review">
   <div class="sheet-like">
     <h2 style="margin:0 0 12px; font-size:18px;">Found on your photo</h2>
+    <div id="ai-check-warning">Check each code against the original before adding. AI misreads digits sometimes, and a wrong code means a locked door.</div>
     <p id="ai-error"></p>
     <div id="ai-review-list"></div>
     <div id="ai-review-empty" style="display:none;">Nothing recognisable in that photo. Try a clearer shot, or add it manually.</div>
@@ -776,7 +787,7 @@
     document.getElementById('ai-setup-overlay').classList.remove('show');
   });
 
-  function resizeImage(file, maxDim = 1600){
+  function resizeImage(file, maxDim = 2000){
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('Could not read that file'));
@@ -795,7 +806,7 @@
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
           resolve({ base64: dataUrl.split(',')[1], media_type: 'image/jpeg' });
         };
         img.src = reader.result;
@@ -847,6 +858,7 @@
     const errEl = document.getElementById('ai-error');
     errEl.textContent = msg;
     errEl.style.display = 'block';
+    document.getElementById('ai-check-warning').style.display = 'none';
     document.getElementById('ai-review-list').innerHTML = '';
     document.getElementById('ai-review-empty').style.display = 'none';
     document.getElementById('overlay-ai-review').classList.add('show');
@@ -861,6 +873,8 @@
     document.getElementById('ai-error').style.display = 'none';
     const list = document.getElementById('ai-review-list');
     list.innerHTML = '';
+
+    document.getElementById('ai-check-warning').style.display = aiResults.length ? 'block' : 'none';
 
     if(aiResults.length === 0){
       document.getElementById('ai-review-empty').style.display = 'block';
