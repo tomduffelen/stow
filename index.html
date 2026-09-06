@@ -271,13 +271,13 @@
   #confirm-cancel{ background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.1); }
   #confirm-delete{ background:var(--danger); color:#fff; }
 
-  #ai-setup-overlay, #overlay-ai-review{
+  #ai-setup-overlay, #overlay-ai-review, #ai-source-overlay{
     position:fixed; inset:0;
     background:rgba(10,14,20,0.6);
     display:none; align-items:flex-end; z-index:15;
   }
-  #ai-setup-overlay.show, #overlay-ai-review.show{ display:flex; }
-  #ai-setup-overlay .sheet-like, #overlay-ai-review .sheet-like{
+  #ai-setup-overlay.show, #overlay-ai-review.show, #ai-source-overlay.show{ display:flex; }
+  #ai-setup-overlay .sheet-like, #overlay-ai-review .sheet-like, #ai-source-overlay .sheet-like{
     background:var(--surface-2);
     width:100%;
     border-radius:24px 24px 0 0;
@@ -285,6 +285,18 @@
     animation:slideup .18s ease-out;
     max-height:85vh;
     overflow-y:auto;
+  }
+  #ai-source-actions{ display:flex; gap:10px; margin-bottom:10px; }
+  #ai-source-actions button{
+    flex:1; padding:16px 12px; border-radius:12px; border:none;
+    background:var(--brass); color:#1B2430; font-size:15px; font-weight:600; cursor:pointer;
+  }
+  #ai-source-actions button:active{ background:var(--brass-soft); }
+  #ai-src-cancel{
+    width:100%; padding:14px; border-radius:12px;
+    background:transparent; color:var(--muted);
+    border:1px solid rgba(255,255,255,0.1);
+    font-size:15px; font-weight:600; cursor:pointer;
   }
   #ai-setup-sheet p{ color:var(--muted); font-size:13.5px; line-height:1.6; margin:0 0 16px; }
 
@@ -349,7 +361,8 @@
   </div>
 </header>
 
-<input type="file" id="ai-file-input" accept="image/*" style="display:none;">
+<input type="file" id="ai-file-camera" accept="image/*" capture="environment" style="display:none;">
+<input type="file" id="ai-file-gallery" accept="image/*" style="display:none;">
 
 <main>
 
@@ -425,6 +438,22 @@
       <button id="confirm-cancel">Cancel</button>
       <button id="confirm-delete">Delete</button>
     </div>
+  </div>
+</div>
+
+<div id="ai-source-overlay">
+  <div class="sheet-like">
+    <h2 style="margin:0 0 8px; font-size:18px;">Add from a photo</h2>
+    <p style="color:var(--muted); font-size:13.5px; line-height:1.6; margin:0 0 16px;">Optionally give this a label — it gets added to whatever is found, so you know where it came from.</p>
+    <div class="field">
+      <label for="f-ai-label">Label (optional)</label>
+      <input id="f-ai-label" type="text" placeholder="e.g. Donizetti Apartment, Verona">
+    </div>
+    <div id="ai-source-actions">
+      <button id="ai-src-camera">Take photo</button>
+      <button id="ai-src-gallery">Choose image</button>
+    </div>
+    <button id="ai-src-cancel">Cancel</button>
   </div>
 </div>
 
@@ -718,7 +747,24 @@
   function getAiEndpoint(){ return localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT; }
 
   document.getElementById('ai-btn').addEventListener('click', () => {
-    document.getElementById('ai-file-input').click();
+    document.getElementById('f-ai-label').value = '';
+    document.getElementById('ai-source-overlay').classList.add('show');
+  });
+  document.getElementById('ai-src-cancel').addEventListener('click', () => {
+    document.getElementById('ai-source-overlay').classList.remove('show');
+  });
+  document.getElementById('ai-source-overlay').addEventListener('click', (e) => {
+    if(e.target.id === 'ai-source-overlay'){
+      document.getElementById('ai-source-overlay').classList.remove('show');
+    }
+  });
+  document.getElementById('ai-src-camera').addEventListener('click', () => {
+    document.getElementById('ai-source-overlay').classList.remove('show');
+    document.getElementById('ai-file-camera').click();
+  });
+  document.getElementById('ai-src-gallery').addEventListener('click', () => {
+    document.getElementById('ai-source-overlay').classList.remove('show');
+    document.getElementById('ai-file-gallery').click();
   });
   document.getElementById('ai-setup-cancel').addEventListener('click', () => {
     document.getElementById('ai-setup-overlay').classList.remove('show');
@@ -728,7 +774,6 @@
     if(!url) return;
     localStorage.setItem(AI_ENDPOINT_KEY, url);
     document.getElementById('ai-setup-overlay').classList.remove('show');
-    document.getElementById('ai-file-input').click();
   });
 
   function resizeImage(file, maxDim = 1600){
@@ -759,10 +804,12 @@
     });
   }
 
-  document.getElementById('ai-file-input').addEventListener('change', async (e) => {
+  async function handleAiFile(e){
     const file = e.target.files[0];
     e.target.value = '';
     if(!file) return;
+
+    const label = document.getElementById('f-ai-label').value.trim();
 
     document.getElementById('ai-loading').classList.add('show');
     try{
@@ -770,7 +817,7 @@
       const res = await fetch(getAiEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, media_type })
+        body: JSON.stringify({ image: base64, media_type, label })
       });
 
       let json;
@@ -791,7 +838,10 @@
       document.getElementById('ai-loading').classList.remove('show');
       showAiError(err.message || 'Something went wrong reading that photo.');
     }
-  });
+  }
+
+  document.getElementById('ai-file-camera').addEventListener('change', handleAiFile);
+  document.getElementById('ai-file-gallery').addEventListener('change', handleAiFile);
 
   function showAiError(msg){
     const errEl = document.getElementById('ai-error');
