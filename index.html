@@ -24,7 +24,8 @@
     --radius:18px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0; padding:0; height:100%;}
+  html,body{margin:0; padding:0;}
+  html{ -webkit-text-size-adjust:100%; }
   body{
     background:
       radial-gradient(circle at 15% 0%, #1d2735 0%, transparent 45%),
@@ -32,8 +33,8 @@
     color:var(--ink);
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height:100vh;
-    padding-bottom:150px;
-    overscroll-behavior-y: none;
+    padding-bottom:170px;
+    -webkit-overflow-scrolling: touch;
   }
   header{
     padding:28px 20px 14px;
@@ -42,6 +43,18 @@
     justify-content:space-between;
   }
   .brand{ display:flex; align-items:center; gap:10px; }
+  .header-actions{ display:flex; align-items:center; gap:6px; }
+  .icon-round-btn{
+    width:38px; height:38px;
+    border-radius:50%;
+    background:var(--surface);
+    border:none;
+    color:var(--brass);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .icon-round-btn:active{ background:var(--surface-2); }
+  .icon-round-btn svg{ width:19px; height:19px; stroke:var(--brass); fill:none; stroke-width:1.8; }
   .brand-mark{
     width:34px; height:34px;
     border-radius:9px;
@@ -67,6 +80,11 @@
   main{ padding:4px 16px 0; }
   section.panel{ display:none; flex-direction:column; gap:14px; }
   section.panel.active{ display:flex; }
+  #list-codes, #list-plans, #list-notes{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
 
   .tag{
     position:relative;
@@ -252,6 +270,66 @@
   }
   #confirm-cancel{ background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.1); }
   #confirm-delete{ background:var(--danger); color:#fff; }
+
+  #ai-setup-overlay, #overlay-ai-review{
+    position:fixed; inset:0;
+    background:rgba(10,14,20,0.6);
+    display:none; align-items:flex-end; z-index:15;
+  }
+  #ai-setup-overlay.show, #overlay-ai-review.show{ display:flex; }
+  #ai-setup-overlay .sheet-like, #overlay-ai-review .sheet-like{
+    background:var(--surface-2);
+    width:100%;
+    border-radius:24px 24px 0 0;
+    padding:24px 20px 28px;
+    animation:slideup .18s ease-out;
+    max-height:85vh;
+    overflow-y:auto;
+  }
+  #ai-setup-sheet p{ color:var(--muted); font-size:13.5px; line-height:1.6; margin:0 0 16px; }
+
+  #ai-loading{
+    position:fixed; inset:0; z-index:30;
+    background:rgba(10,14,20,0.85);
+    display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:16px;
+  }
+  #ai-loading.show{ display:flex; }
+  .spinner{
+    width:38px; height:38px;
+    border-radius:50%;
+    border:3px solid rgba(201,162,39,0.2);
+    border-top-color:var(--brass);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #ai-loading p{ color:var(--muted); font-size:14px; }
+
+  #ai-review-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:16px; max-height:50vh; overflow-y:auto; }
+  .ai-item{
+    background:var(--bg);
+    border:1px solid rgba(255,255,255,0.06);
+    border-radius:14px;
+    padding:12px 14px;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+  }
+  .ai-item input[type="checkbox"]{
+    width:20px; height:20px; margin-top:4px; accent-color:var(--brass); flex-shrink:0;
+  }
+  .ai-item-fields{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .ai-item-type{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--brass); font-weight:700;
+  }
+  .ai-item-fields input{
+    width:100%; background:var(--surface); border:1px solid rgba(255,255,255,0.06);
+    color:var(--ink); padding:8px 10px; border-radius:8px; font-size:14px;
+  }
+  .ai-item-fields input:focus{ outline:none; border-color:var(--brass); }
+  #ai-review-empty{ color:var(--muted); font-size:14px; text-align:center; padding:20px 0; }
+  #ai-error{ color:var(--danger); font-size:13.5px; margin-bottom:14px; display:none; }
 </style>
 </head>
 <body>
@@ -264,7 +342,14 @@
       <p class="sub" id="header-sub">Saved only on this phone</p>
     </div>
   </div>
+  <div class="header-actions">
+    <button class="icon-round-btn" id="ai-btn" aria-label="Upload with AI">
+      <svg viewBox="0 0 24 24"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+    </button>
+  </div>
 </header>
+
+<input type="file" id="ai-file-input" accept="image/*" capture="environment" style="display:none;">
 
 <main>
 
@@ -339,6 +424,39 @@
     <div id="confirm-actions">
       <button id="confirm-cancel">Cancel</button>
       <button id="confirm-delete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="ai-setup-overlay">
+  <div id="ai-setup-sheet" class="sheet-like">
+    <h2 style="margin:0 0 12px; font-size:18px;">Connect AI upload</h2>
+    <p>Paste the worker address you set up once. It's saved on this phone only.</p>
+    <div class="field">
+      <label for="f-ai-endpoint">Worker URL</label>
+      <input id="f-ai-endpoint" type="url" placeholder="https://stow-ai.yourname.workers.dev">
+    </div>
+    <div id="sheet-actions">
+      <button id="ai-setup-cancel">Cancel</button>
+      <button id="ai-setup-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="ai-loading">
+  <div class="spinner"></div>
+  <p>Reading the photo…</p>
+</div>
+
+<div id="overlay-ai-review">
+  <div class="sheet-like">
+    <h2 style="margin:0 0 12px; font-size:18px;">Found on your photo</h2>
+    <p id="ai-error"></p>
+    <div id="ai-review-list"></div>
+    <div id="ai-review-empty" style="display:none;">Nothing recognisable in that photo. Try a clearer shot, or add it manually.</div>
+    <div id="sheet-actions">
+      <button id="ai-review-cancel">Cancel</button>
+      <button id="ai-review-add">Add selected</button>
     </div>
   </div>
 </div>
@@ -590,6 +708,147 @@
     }
     pendingDelete = null;
     document.getElementById('confirm-overlay').classList.remove('show');
+  });
+
+  // ---- Upload with AI ----
+  const AI_ENDPOINT_KEY = 'stow-ai-endpoint';
+  let aiResults = null;
+
+  function getAiEndpoint(){ return localStorage.getItem(AI_ENDPOINT_KEY) || ''; }
+
+  document.getElementById('ai-btn').addEventListener('click', () => {
+    if(!getAiEndpoint()){
+      document.getElementById('f-ai-endpoint').value = '';
+      document.getElementById('ai-setup-overlay').classList.add('show');
+    } else {
+      document.getElementById('ai-file-input').click();
+    }
+  });
+  document.getElementById('ai-setup-cancel').addEventListener('click', () => {
+    document.getElementById('ai-setup-overlay').classList.remove('show');
+  });
+  document.getElementById('ai-setup-save').addEventListener('click', () => {
+    const url = document.getElementById('f-ai-endpoint').value.trim();
+    if(!url) return;
+    localStorage.setItem(AI_ENDPOINT_KEY, url);
+    document.getElementById('ai-setup-overlay').classList.remove('show');
+    document.getElementById('ai-file-input').click();
+  });
+
+  document.getElementById('ai-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result.split(',')[1];
+      document.getElementById('ai-loading').classList.add('show');
+      try{
+        const res = await fetch(getAiEndpoint(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64, media_type: file.type || 'image/jpeg' })
+        });
+        const json = await res.json();
+        document.getElementById('ai-loading').classList.remove('show');
+        if(json.error){
+          showAiError('Couldn\u2019t read that photo. Try again, or add it manually.');
+          return;
+        }
+        openAiReview(json);
+      } catch(err){
+        document.getElementById('ai-loading').classList.remove('show');
+        showAiError('Couldn\u2019t reach the AI worker. Check the URL is right and try again.');
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function showAiError(msg){
+    const errEl = document.getElementById('ai-error');
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+    document.getElementById('ai-review-list').innerHTML = '';
+    document.getElementById('ai-review-empty').style.display = 'none';
+    document.getElementById('overlay-ai-review').classList.add('show');
+  }
+
+  function openAiReview(json){
+    aiResults = [];
+    ['codes','plans','notes'].forEach(type => {
+      (json[type] || []).forEach(item => aiResults.push({ type, ...item }));
+    });
+
+    document.getElementById('ai-error').style.display = 'none';
+    const list = document.getElementById('ai-review-list');
+    list.innerHTML = '';
+
+    if(aiResults.length === 0){
+      document.getElementById('ai-review-empty').style.display = 'block';
+    } else {
+      document.getElementById('ai-review-empty').style.display = 'none';
+      aiResults.forEach((item, i) => {
+        const row = document.createElement('div');
+        row.className = 'ai-item';
+        const typeLabel = item.type === 'codes' ? 'Code' : item.type === 'plans' ? 'Plan' : 'Note';
+        let extraField = '';
+        if(item.type === 'codes'){
+          extraField = `<input type="text" data-i="${i}" data-field="code" value="${escapeHtml(item.code || '')}" placeholder="Code">`;
+        } else if(item.type === 'plans'){
+          extraField = `<input type="date" data-i="${i}" data-field="when" value="${escapeHtml(item.when || '')}">`;
+        }
+        row.innerHTML = `
+          <input type="checkbox" data-i="${i}" checked>
+          <div class="ai-item-fields">
+            <div class="ai-item-type">${typeLabel}</div>
+            <input type="text" data-i="${i}" data-field="name" value="${escapeHtml(item.name || '')}" placeholder="Name">
+            ${extraField}
+            <input type="text" data-i="${i}" data-field="note" value="${escapeHtml(item.note || '')}" placeholder="Note (optional)">
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+    document.getElementById('overlay-ai-review').classList.add('show');
+  }
+
+  document.getElementById('ai-review-cancel').addEventListener('click', () => {
+    document.getElementById('overlay-ai-review').classList.remove('show');
+    aiResults = null;
+  });
+
+  document.getElementById('overlay-ai-review').addEventListener('input', (e) => {
+    const input = e.target;
+    const i = input.dataset.i;
+    if(i === undefined || !aiResults || !aiResults[i]) return;
+    const field = input.dataset.field;
+    if(field) aiResults[i][field] = input.value;
+  });
+
+  document.getElementById('ai-review-add').addEventListener('click', () => {
+    if(!aiResults) return;
+    const checks = document.querySelectorAll('#ai-review-list input[type="checkbox"]');
+    let added = 0;
+    checks.forEach(chk => {
+      if(!chk.checked) return;
+      const item = aiResults[chk.dataset.i];
+      if(!item || !item.name) return;
+      const entry = { id: Date.now().toString() + Math.random().toString(36).slice(2,6), name: item.name, note: item.note || '' };
+      if(item.type === 'codes'){
+        if(!item.code) return;
+        entry.code = item.code;
+      }
+      if(item.type === 'plans') entry.when = item.when || '';
+      data[item.type].push(entry);
+      added++;
+    });
+    if(added > 0){
+      persist('codes'); persist('plans'); persist('notes');
+      renderAll();
+    }
+    document.getElementById('overlay-ai-review').classList.remove('show');
+    aiResults = null;
   });
 
   // ---- Service worker ----
