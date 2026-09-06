@@ -712,17 +712,13 @@
 
   // ---- Upload with AI ----
   const AI_ENDPOINT_KEY = 'stow-ai-endpoint';
+  const DEFAULT_AI_ENDPOINT = 'https://stow-ai.tomduffelen.workers.dev';
   let aiResults = null;
 
-  function getAiEndpoint(){ return localStorage.getItem(AI_ENDPOINT_KEY) || ''; }
+  function getAiEndpoint(){ return localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT; }
 
   document.getElementById('ai-btn').addEventListener('click', () => {
-    if(!getAiEndpoint()){
-      document.getElementById('f-ai-endpoint').value = '';
-      document.getElementById('ai-setup-overlay').classList.add('show');
-    } else {
-      document.getElementById('ai-file-input').click();
-    }
+    document.getElementById('ai-file-input').click();
   });
   document.getElementById('ai-setup-cancel').addEventListener('click', () => {
     document.getElementById('ai-setup-overlay').classList.remove('show');
